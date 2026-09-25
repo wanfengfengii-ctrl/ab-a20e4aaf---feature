@@ -115,6 +115,15 @@ body {
   border-color: var(--accent);
 }
 
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  border-color: var(--border);
+}
+
 .btn--primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -379,6 +388,228 @@ body {
   margin-top: 28px;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* 只读快照横幅 */
+.snapshot-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(79, 140, 255, 0.12);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+}
+
+/* 复核结论与封存内容的一致性提示 */
+.snapshot-check {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.snapshot-check--ok {
+  color: var(--ok);
+}
+
+.snapshot-check--bad {
+  color: var(--bad);
+}
+
+/* 本机审查链 */
+.chain {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 22px;
+  margin-top: 18px;
+}
+
+.chain h3 {
+  margin: 0 0 6px;
+}
+
+.chain__status {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+
+.chain__status--bad {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.chain__broken {
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 93, 93, 0.08);
+  font-size: 13.5px;
+}
+
+.chain__broken p {
+  margin: 0 0 10px;
+}
+
+.chain__hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 8px 0 0;
+}
+
+/* 封存表单 */
+.seal {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.seal h4 {
+  margin: 0 0 8px;
+}
+
+.seal__row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.seal__row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.seal__row input {
+  background: #0b1020;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  min-width: 180px;
+  font-size: 13px;
+}
+
+.seal__row input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.seal__hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 8px 0 0;
+}
+
+/* 链记录列表 */
+.chain__list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.chain__item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+}
+
+.chain__item summary {
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+}
+
+.chain__seq {
+  font-weight: 700;
+}
+
+.chain__verdict {
+  font-weight: 700;
+}
+
+.chain__verdict--ok {
+  color: var(--ok);
+}
+
+.chain__verdict--bad {
+  color: var(--bad);
+}
+
+.chain__reviewer {
+  color: var(--text);
+}
+
+.chain__digest {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chain__applies {
+  background: rgba(47, 191, 113, 0.15);
+  color: var(--ok);
+  border: 1px solid var(--ok);
+  border-radius: 10px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.chain__body {
+  margin-top: 10px;
+}
+
+.chain__body h5 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+}
+
+.chain__kv {
+  font-size: 13px;
+  margin: 4px 0;
+  word-break: break-all;
+}
+
+.chain__graphs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.chain__pre {
+  background: #0b1020;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow: auto;
+  font-size: 12px;
+  max-height: 220px;
+  margin: 0;
+}
+
+.chain__traces {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .chain__graphs,
+  .chain__traces {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {

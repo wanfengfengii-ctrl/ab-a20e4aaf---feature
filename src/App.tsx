@@ -1,5 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { analyze } from './analysis';
+import { canonicalize } from './canonical';
+import {
+  loadChain,
+  persistChain,
+  recordAppliesTo,
+  resultMatchesRecord,
+  sealRecord,
+  type ChainState,
+  type CurrentBinding,
+  type ReviewRecord,
+} from './reviewChain';
 import { validatePair } from './validation';
 import type { AnalysisResult, GateEval, Graph, GraphError } from './types';
 import { GraphSvg } from './components/GraphSvg';
@@ -59,10 +70,143 @@ function TraceTable({
   );
 }
 
+/** 单条封存记录（可展开查看绑定内容并恢复只读快照） */
+function ChainRecord({
+  rec,
+  applies,
+  onRestore,
+}: {
+  rec: ReviewRecord;
+  applies: boolean;
+  onRestore: (rec: ReviewRecord) => void;
+}) {
+  const traceA = rec.trace.filter((t) => t.graph === 'A');
+  const traceB = rec.trace.filter((t) => t.graph === 'B');
+  return (
+    <li className="chain__item" data-testid={`chain-record-${rec.seq}`}>
+      <details>
+        <summary>
+          <span className="mono chain__seq">#{rec.seq}</span>
+          <span
+            className={`chain__verdict ${
+              rec.equivalent ? 'chain__verdict--ok' : 'chain__verdict--bad'
+            }`}
+          >
+            {rec.equivalent ? 'EQUIVALENT' : 'NOT EQUIVALENT'}
+          </span>
+          <span className="chain__reviewer">审查人：{rec.reviewer}</span>
+          <span className="mono chain__digest">
+            摘要 {rec.digest.slice(0, 12)}…
+          </span>
+          {applies && (
+            <span className="chain__applies" data-testid={`applies-${rec.seq}`}>
+              适用于当前草稿
+            </span>
+          )}
+        </summary>
+        <div className="chain__body">
+          <p className="chain__kv">
+            备注：{rec.remark === '' ? '（无）' : rec.remark}
+          </p>
+          <p className="chain__kv">
+            共享变量序：<span className="mono">[{rec.variables.join(', ')}]</span>
+          </p>
+          {rec.equivalent ? (
+            <p className="chain__kv">
+              复算输出（全 0 自检赋值）：旧图 A ={' '}
+              <span className="mono">{rec.outputA}</span>，新图 B ={' '}
+              <span className="mono">{rec.outputB}</span>
+            </p>
+          ) : (
+            <p className="chain__kv">
+              反例：
+              <span className="mono">
+                {rec.variables
+                  .map((v) => `${v}=${rec.counterexample[v]}`)
+                  .join(', ')}
+              </span>
+              {' · '}复算输出：旧图 A ={' '}
+              <span className="mono">{rec.outputA}</span>，新图 B ={' '}
+              <span className="mono">{rec.outputB}</span>
+            </p>
+          )}
+          <div className="chain__graphs">
+            <div>
+              <h5>旧图 A 规范化内容</h5>
+              <pre className="chain__pre">
+                {JSON.stringify(
+                  { nodes: rec.graphA.nodes, output: rec.graphA.output },
+                  null,
+                  2,
+                )}
+              </pre>
+            </div>
+            <div>
+              <h5>新图 B 规范化内容</h5>
+              <pre className="chain__pre">
+                {JSON.stringify(
+                  { nodes: rec.graphB.nodes, output: rec.graphB.output },
+                  null,
+                  2,
+                )}
+              </pre>
+            </div>
+          </div>
+          <h5>逐门复算摘要</h5>
+          <div className="chain__traces">
+            <TraceTable
+              title="封存 · 旧图 A（逐门复算摘要）"
+              trace={traceA}
+              outputId={rec.graphA.output}
+            />
+            <TraceTable
+              title="封存 · 新图 B（逐门复算摘要）"
+              trace={traceB}
+              outputId={rec.graphB.output}
+            />
+          </div>
+          <p className="chain__kv">
+            前序摘要：
+            <span className="mono" data-testid={`prevdigest-${rec.seq}`}>
+              {rec.prevDigest}
+            </span>
+          </p>
+          <p className="chain__kv">
+            记录摘要：
+            <span className="mono" data-testid={`digest-${rec.seq}`}>
+              {rec.digest}
+            </span>
+          </p>
+          <button
+            type="button"
+            className="btn"
+            data-testid={`restore-${rec.seq}`}
+            onClick={() => onRestore(rec)}
+          >
+            恢复只读快照
+          </button>
+        </div>
+      </details>
+    </li>
+  );
+}
+
 export function App() {
   const [textA, setTextA] = useState('');
   const [textB, setTextB] = useState('');
   const [view, setView] = useState<View>({ status: 'idle' });
+  // 本机审查链：挂载时从 localStorage 读出并逐条复核（序号/前序摘要/记录摘要）
+  const [chain, setChain] = useState<ChainState>(() => loadChain());
+  const [reviewer, setReviewer] = useState('');
+  const [remark, setRemark] = useState('');
+  // 只读快照模式：编辑区锁定为某条封存记录的内容，退出时还原之前的草稿
+  const [snapshot, setSnapshot] = useState<{
+    seq: number;
+    savedA: string;
+    savedB: string;
+  } | null>(null);
+
+  const readOnly = snapshot !== null;
 
   // 任一错误整次拒绝：只有在校验全过后才保留门图与结论
   const run = () => {
@@ -88,6 +232,74 @@ export function App() {
     setView({ status: 'idle' });
   };
 
+  // 当前草稿 + 当前结论构成的绑定：草稿在比较后被改动、校验失败或
+  // 尚未完成比较时为 null（此时任何记录都不得标作适用于当前草稿）
+  const currentBinding: CurrentBinding | null = useMemo(() => {
+    if (view.status !== 'ok') return null;
+    const { graphA, graphB, errors } = validatePair(textA, textB);
+    if (errors.length > 0 || !graphA || !graphB) return null;
+    if (
+      canonicalize(graphA) !== canonicalize(view.graphA) ||
+      canonicalize(graphB) !== canonicalize(view.graphB)
+    ) {
+      return null;
+    }
+    return { graphA, graphB, result: view.result };
+  }, [view, textA, textB]);
+
+  const snapshotRecord = snapshot
+    ? chain.records.find((r) => r.seq === snapshot.seq)
+    : undefined;
+
+  // 封存审查：仅在一次成功比较之后、链可信且非快照模式下可用
+  const seal = () => {
+    if (view.status !== 'ok' || !chain.trusted || readOnly) return;
+    const name = reviewer.trim();
+    if (name.length === 0) return;
+    const rec = sealRecord(chain.records, {
+      graphA: view.graphA,
+      graphB: view.graphB,
+      result: view.result,
+      reviewer: name,
+      remark: remark.trim(),
+    });
+    const records = [...chain.records, rec];
+    persistChain(records);
+    setChain({ trusted: true, records });
+    setRemark('');
+  };
+
+  // 恢复某条记录的只读快照并立即复核一次；退出快照可还原之前的草稿
+  const restoreSnapshot = (rec: ReviewRecord) => {
+    setSnapshot((prev) => ({
+      seq: rec.seq,
+      savedA: prev ? prev.savedA : textA,
+      savedB: prev ? prev.savedB : textB,
+    }));
+    setTextA(
+      JSON.stringify({ nodes: rec.graphA.nodes, output: rec.graphA.output }, null, 2),
+    );
+    setTextB(
+      JSON.stringify({ nodes: rec.graphB.nodes, output: rec.graphB.output }, null, 2),
+    );
+    const result = analyze(rec.graphA, rec.graphB);
+    setView({ status: 'ok', graphA: rec.graphA, graphB: rec.graphB, result });
+  };
+
+  const exitSnapshot = () => {
+    if (!snapshot) return;
+    setTextA(snapshot.savedA);
+    setTextB(snapshot.savedB);
+    setSnapshot(null);
+    setView({ status: 'idle' });
+  };
+
+  // 链不可信时允许清空本机存储重新开始（仅本机数据）
+  const clearBrokenChain = () => {
+    persistChain([]);
+    setChain({ trusted: true, records: [] });
+  };
+
   const traceA =
     view.status === 'ok'
       ? view.result.trace.filter((t) => t.graph === 'A')
@@ -103,9 +315,23 @@ export function App() {
         <h1>联锁控制器门图等价性工作台</h1>
         <p className="app__subtitle">
           纯前端 · ROBDD（ASCII 变量序唯一表/计算表/约简/Apply）·
-          异或根为 0 即等价，否则直接读取根节点最小满足赋值摘要作为唯一反例
+          异或根为 0 即等价，否则直接读取根节点最小满足赋值摘要作为唯一反例 ·
+          结论可封存为本机 SHA-256 审查链
         </p>
       </header>
+
+      {snapshot && (
+        <section className="snapshot-banner" data-testid="snapshot-banner">
+          <span>
+            只读快照：封存记录 #{snapshot.seq}
+            {snapshotRecord ? `（审查人：${snapshotRecord.reviewer}）` : ''}
+            。编辑区已锁定，可直接「校验并比较」复核；结论须与封存内容一致。
+          </span>
+          <button type="button" className="btn" onClick={exitSnapshot}>
+            退出快照
+          </button>
+        </section>
+      )}
 
       <section className="editors">
         <div className="editor">
@@ -118,6 +344,7 @@ export function App() {
                   type="button"
                   className="btn btn--mini"
                   onClick={() => loadExample(k)}
+                  disabled={readOnly}
                 >
                   {EXAMPLES[k].label}
                 </button>
@@ -131,6 +358,7 @@ export function App() {
             value={textA}
             onChange={(e) => setTextA(e.target.value)}
             placeholder='{"nodes":[...],"output":"..."}'
+            readOnly={readOnly}
           />
         </div>
         <div className="editor">
@@ -144,6 +372,7 @@ export function App() {
             value={textB}
             onChange={(e) => setTextB(e.target.value)}
             placeholder='{"nodes":[...],"output":"..."}'
+            readOnly={readOnly}
           />
         </div>
       </section>
@@ -152,7 +381,7 @@ export function App() {
         <button type="button" className="btn btn--primary" onClick={run}>
           校验并比较
         </button>
-        <button type="button" className="btn" onClick={clearAll}>
+        <button type="button" className="btn" onClick={clearAll} disabled={readOnly}>
           清空
         </button>
       </section>
@@ -206,6 +435,20 @@ export function App() {
               计算表命中 {view.result.bddStats.cacheHits} / 未命中{' '}
               {view.result.bddStats.cacheMisses}
             </div>
+            {snapshotRecord && (
+              <p
+                className={`snapshot-check ${
+                  resultMatchesRecord(view.result, snapshotRecord)
+                    ? 'snapshot-check--ok'
+                    : 'snapshot-check--bad'
+                }`}
+                data-testid="snapshot-check"
+              >
+                {resultMatchesRecord(view.result, snapshotRecord)
+                  ? `与封存记录 #${snapshotRecord.seq} 核对一致（结论 / 反例 / 逐门复算摘要）`
+                  : `警告：复核结论与封存记录 #${snapshotRecord.seq} 的内容不一致`}
+              </p>
+            )}
           </section>
 
           {!view.result.equivalent && (
@@ -268,9 +511,105 @@ export function App() {
         </>
       )}
 
+      <section className="chain" data-testid="review-chain">
+        <h3>本机审查链</h3>
+        <p
+          className={`chain__status ${chain.trusted ? '' : 'chain__status--bad'}`}
+          data-testid="chain-status"
+        >
+          {chain.trusted
+            ? `链可信 · 共 ${chain.records.length} 条封存记录`
+            : '链不可信'}
+        </p>
+
+        {!chain.trusted && (
+          <div className="chain__broken" data-testid="chain-broken">
+            <p>
+              审查链校验失败：第 {chain.brokenSeq} 条记录
+              {chain.reason ? `（${chain.reason}）` : ''}。 已停止新增封存，
+              现有记录不再展示、不可恢复。
+            </p>
+            <button
+              type="button"
+              className="btn"
+              data-testid="chain-clear"
+              onClick={clearBrokenChain}
+            >
+              清除不可信链并重新开始
+            </button>
+          </div>
+        )}
+
+        {chain.trusted && view.status === 'ok' && !readOnly && (
+          <div className="seal" data-testid="seal-form">
+            <h4>封存本次审查</h4>
+            <div className="seal__row">
+              <label>
+                审查人
+                <input
+                  value={reviewer}
+                  onChange={(e) => setReviewer(e.target.value)}
+                  placeholder="姓名或工号"
+                  data-testid="reviewer-input"
+                />
+              </label>
+              <label>
+                备注
+                <input
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  placeholder="可留空"
+                  data-testid="remark-input"
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn--primary"
+                data-testid="seal-submit"
+                onClick={seal}
+                disabled={reviewer.trim() === ''}
+              >
+                封存审查
+              </button>
+            </div>
+            <p className="seal__hint">
+              封存绑定：两份规范化门图、共享变量序、等价结论或反例、逐门复算摘要、
+              审查人与备注；记录摘要接上前序记录摘要，构成确定性 SHA-256 链。
+            </p>
+          </div>
+        )}
+
+        {chain.trusted && view.status === 'ok' && readOnly && (
+          <p className="chain__hint">快照核对模式下不新增封存；退出快照后可继续。</p>
+        )}
+
+        {chain.trusted && view.status !== 'ok' && (
+          <p className="chain__hint">
+            完成一次成功的比较后可在此封存审查；输入错误、比较被拒绝或未完成比较时不产生记录。
+          </p>
+        )}
+
+        {chain.trusted && chain.records.length === 0 && (
+          <p className="chain__hint">尚无封存记录。</p>
+        )}
+
+        {chain.trusted && chain.records.length > 0 && (
+          <ol className="chain__list">
+            {chain.records.map((rec) => (
+              <ChainRecord
+                key={rec.seq}
+                rec={rec}
+                applies={recordAppliesTo(rec, currentBinding)}
+                onRestore={restoreSnapshot}
+              />
+            ))}
+          </ol>
+        )}
+      </section>
+
       <footer className="app__footer">
         无业务后端、无在线服务、无第三方 BDD 库；判定全过程在浏览器内完成，可由
-        Vitest 单元测试与 Playwright 验收复算。
+        Vitest 单元测试与 Playwright 验收复算。审查链仅保存在本机浏览器存储中。
       </footer>
     </div>
   );
