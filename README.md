@@ -59,6 +59,30 @@
 - `src/validation.ts` — 解析、校验与错误排序
 - `src/analysis.ts` — 建图、异或根、摘要直读、逐门复算
 - `src/graphLayout.ts` / `src/components/GraphSvg.tsx` — SVG 图形
+- `src/review/sha256.ts` / `src/review/chain.ts` — 本机审查链（见下）
+
+## 本机审查链（封存审查）
+
+一次比较成功后，结论下方出现「封存审查」：填写**审查人**（必填）与备注（可选）
+后点击封存，把可复算的结论追加进本机审查链，供换班人员重新打开工作台时核对。
+
+- **记录绑定**：两份通过校验的门图规范化内容、共享变量序、等价结论或
+  唯一反例、逐门复算摘要、审查人与备注、封存时刻。
+- **确定性 SHA-256 链**：记录摘要 = `SHA-256(规范化序列化(记录正文 + 前序摘要))`，
+  首条前序摘要为 64 个 `0`；规范化序列化对对象键排序，同一内容必得同一摘要。
+  SHA-256 为仓库内手写实现（`src/review/sha256.ts`），不依赖 Web Crypto，
+  浏览器与测试环境行为一致。
+- **适用于当前草稿**：封存后若任一输入草稿、比较结论或反例发生变化，
+  记录立即失去该标记；草稿与结论复原一致时标记恢复。
+- **刷新复核**：链保存在本机 `localStorage`（键
+  `interlocking.reviewChain.v1`）。每次打开/刷新逐条重算序号、前序摘要与
+  记录摘要；任一不一致即整链显示**不可信**并**停止新增封存**（记录仍可见供核查，
+  恢复快照被禁用）。
+- **只读快照恢复**：合法链可按序号展开任一记录，点击「恢复快照」把封存的
+  规范化门图只读回填并立即复算；复算结论必须与封存内容一致（横幅提示），
+  「退出快照」后恢复可编辑。
+- **不产生记录的情形**：输入错误、比较被整次拒绝、尚未完成比较、审查人为空、
+  链不可信。
 
 ## 本地开发与测试
 
@@ -95,10 +119,14 @@ src/
   validation.ts         校验与错误排序
   analysis.ts           等价判定 / 反例 / 逐门复算
   graphLayout.ts        确定性分层布局
+  review/sha256.ts      手写 SHA-256（确定性、无依赖）
+  review/chain.ts       审查链：封存 / 摘要 / 校验 / 存取 / 适用性
   components/GraphSvg.tsx
+  components/TraceTable.tsx
+  components/ReviewChainPanel.tsx
   App.tsx main.tsx styles.css examples.ts
 tests/
-  unit/                 Vitest
+  unit/                 Vitest（含 App 级审查链集成测试）
   e2e/                  Playwright
 Dockerfile docker-compose.yml nginx.conf
 ```
