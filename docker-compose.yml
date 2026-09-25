@@ -1,0 +1,30 @@
+# 联锁门图等价性工作台编排
+#
+# 启动静态页面（宿主端口可用 WEB_PORT 覆盖，默认 8080）：
+#   WEB_PORT=9090 docker compose up --build web
+#
+# 一次性验收（跑完 Playwright 即退出，退出码即验收结论）：
+#   docker compose up --build --exit-code-from verify verify
+# 或：
+#   docker compose run --rm verify
+
+services:
+  web:
+    build:
+      context: .
+      target: web
+    image: interlocking-workbench-web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+  verify:
+    build:
+      context: .
+      target: verify
+    image: interlocking-workbench-verify
+    environment:
+      E2E_BASE_URL: http://web:80
+    depends_on:
+      web:
+        condition: service_started
+    restart: "no"

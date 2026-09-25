@@ -1,0 +1,390 @@
+:root {
+  --bg: #0f1420;
+  --panel: #171e2e;
+  --panel-2: #1d2638;
+  --border: #2b3750;
+  --text: #e6ebf5;
+  --muted: #9aa7bd;
+  --accent: #4f8cff;
+  --ok: #2fbf71;
+  --bad: #ff5d5d;
+  --warn: #f5a524;
+  --edge: #5a6b8c;
+  --live: #4f8cff;
+  font-family:
+    'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px 48px;
+}
+
+.app__header h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.app__subtitle {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 双栏粘贴区 */
+.editors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor__bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.editor__bar label {
+  font-weight: 600;
+}
+
+.editor__examples {
+  display: flex;
+  gap: 6px;
+}
+
+.editor__area {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  background: #0b1020;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  tab-size: 2;
+}
+
+.editor__area:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0 22px;
+}
+
+.btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn--mini {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.idle-hint {
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 18px 22px;
+}
+
+.idle-hint code {
+  background: #0b1020;
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* 错误列表 */
+.errors {
+  background: var(--panel);
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  padding: 16px 22px;
+}
+
+.errors h3 {
+  margin: 0 0 4px;
+}
+
+.errors__hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.errors__list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.error__tag {
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.error__kind {
+  background: #0b1020;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.error__node {
+  color: var(--warn);
+}
+
+/* 结论区 */
+.verdict {
+  border-radius: 8px;
+  padding: 16px 22px;
+  margin-bottom: 18px;
+}
+
+.verdict--ok {
+  background: rgba(47, 191, 113, 0.12);
+  border: 1px solid var(--ok);
+}
+
+.verdict--bad {
+  background: rgba(255, 93, 93, 0.12);
+  border: 1px solid var(--bad);
+}
+
+.verdict h2 {
+  margin: 0 0 6px;
+  font-size: 19px;
+}
+
+.verdict__meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 反例表 */
+.counterexample {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 22px;
+  margin-bottom: 18px;
+}
+
+.counterexample h3 {
+  margin: 0 0 10px;
+}
+
+.ce__table {
+  border-collapse: collapse;
+}
+
+.ce__table th,
+.ce__table td {
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.ce__bit[data-bit='0'] {
+  color: var(--muted);
+}
+
+.ce__bit[data-bit='1'] {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.ce__outputs {
+  margin: 10px 0 0;
+}
+
+/* 图形区 */
+.graphics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.graph-pane {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.graph-pane__title {
+  padding: 8px 14px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.graph-pane__scroll {
+  overflow: auto;
+  max-height: 380px;
+}
+
+.node__box {
+  fill: #1d2638;
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.node--input .node__box {
+  fill: #20304e;
+  stroke: var(--accent);
+}
+
+.node--output .node__box {
+  stroke-width: 2.5;
+  stroke: var(--ok);
+}
+
+.node__id {
+  fill: var(--text);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+}
+
+.node__type {
+  fill: var(--muted);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1.5;
+}
+
+.edge--live {
+  stroke: var(--live);
+  stroke-width: 2;
+}
+
+.node__value-badge circle {
+  fill: var(--accent);
+  stroke: #0b1020;
+}
+
+.node__value-text {
+  fill: #fff;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+}
+
+/* 逐门复算表 */
+.traces {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.trace h4 {
+  margin: 0 0 8px;
+}
+
+.trace__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.trace__table th,
+.trace__table td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.trace__table th {
+  background: var(--panel-2);
+}
+
+.trace__row--output {
+  background: rgba(47, 191, 113, 0.1);
+  font-weight: 700;
+}
+
+.trace__value {
+  font-weight: 700;
+  text-align: center;
+}
+
+.app__footer {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .editors,
+  .graphics,
+  .traces {
+    grid-template-columns: 1fr;
+  }
+}
